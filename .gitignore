@@ -143,4 +143,6 @@ Temporary Items
 .history
 .ionide
 
+# Other Files
+*.pdf
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,c++,c,macos,cmake
