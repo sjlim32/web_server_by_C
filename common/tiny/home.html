@@ -1,7 +1,38 @@
-<html>
-<head><title>test</title></head>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>test</title>
+<style>
+  .pic {
+    height: 100%;
+    margin: 0;
+
+    display: flex;
+    flex-direction: row;
+  }
+  img, video {
+    margin: 10px;
+    align-self: center;
+  }
+</style>
+</head>
 <body> 
-<img align="middle" src="godzilla.gif">
-Dave O'Hallaron
+  <div>Dave O'Hallaron</div>
+  <div class="pic">
+    <img src="godzilla.gif">
+    <video controls width="200" height="300">
+      <source src="hyein's_cat.mp4" type="video/mp4">
+    </video>
+  </div>
+  <!-- CASPP 과제 11.10 -->
+  <form action="cgi-bin/adder">
+    <label for="num1"></label>
+    <input id="num1" name="n2"></input>
+    <label for="num2"></label>
+    <input id="num2" name="n2"></input>
+    <input type="submit"></input>
+  </form>
 </body>
 </html>

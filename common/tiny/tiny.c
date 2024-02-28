@@ -11,7 +11,7 @@
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
 int parse_uri(char *uri, char *filename, char *cgiargs);
-void serve_static(int fd, char *filename, int filesize);
+void serve_static(int fd, char *filename, char *method, int filesize);
 void get_filetype(char *filename, char *filetype);
 void serve_dynamic(int fd, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
@@ -43,20 +43,21 @@ int main(int argc, char **argv) {
 
 void doit(int fd)
 {
-  int is_static;    /* uri가 정적 인지 = (1), 동적인지(0) 확인하기 위한 변수 */
+  int is_static;    // uri가 정적 인지 = (1), 동적인지(0) 확인하기 위한 변수
   struct stat sbuf;
   char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
   char filename[MAXLINE], cgiargs[MAXLINE];
   rio_t rio;
   
-  Rio_readinitb(&rio, fd);                            /* &rio에 파일 디스크립터(fd)로 초기화 */
-  Rio_readlineb(&rio, buf, MAXLINE);                  /* &rio에 버퍼(buf)의 값을 읽어옴 */
+  Rio_readinitb(&rio, fd);                            // &rio에 파일 디스크립터(fd)로 초기화
+  Rio_readlineb(&rio, buf, MAXLINE);                  // &rio에 버퍼(buf)의 값을 읽어옴
   printf("Request headers:\n");
-  printf("%s", buf);                                  /* 버퍼의 내용을 출력 */
+  printf("%s", buf);                                  // 버퍼의 내용을 출력
   /* string scanf : 스트링을 읽고, 그 스트링을 뒤의 인자들에게 저장함 */
-  sscanf(buf, "%s %s %s", method, uri, version);      /* buf에 저장된 문자열을 Null('\0')을 기준으로 나누어 저장 */
-  if (strcasecmp(method, "GET"))      /* strcsasecmp : method에 저장된 문자값을 뒤의 인자와 비교해서, 같으면 0 틀리면 1 */
-  {
+  sscanf(buf, "%s %s %s", method, uri, version);      // buf에 저장된 문자열을 Null('\0')을 기준으로 나누어 저장
+  /* CASPP 과제 11.11, method가 GET이나, HEAD가 아니면 if문으로 들어와서 error 출력 */
+  if (strcasecmp(method, "GET") && (strcasecmp(method, "HEAD")))
+  {   // strcsasecmp : method에 저장된 문자값을 뒤의 인자와 비교해서, 같으면 0 틀리면 1 */
     clienterror(fd, method, "501", "Not implemented", "Tiny does not implement this method");
     return;
   }
@@ -72,7 +73,6 @@ void doit(int fd)
   3-2. query 값이 없으면 cgiargs를 빈 값으로 만듦 
   */
   is_static = parse_uri(uri, filename, cgiargs);
-
   if (stat(filename, &sbuf) < 0)
   {
     clienterror(fd, filename, "404", "Not found", "Tiny couldn't find this file");
@@ -86,14 +86,13 @@ void doit(int fd)
       clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't read the file");
       return;
     }
-    serve_static(fd, filename, sbuf.st_size);
+    serve_static(fd, filename, method, sbuf.st_size);
   }
   else 
   {
     if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode))
     {
       clienterror(fd, filename, "403", "Forbidden", "Tiny coudln't run the CGI program");
-
       return;
     }
     serve_dynamic(fd, filename, cgiargs);
@@ -101,7 +100,7 @@ void doit(int fd)
 }
 
 /* 
- ? *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* Function *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* ?
+ ! *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* Function *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* ?
  */
 
 void read_requesthdrs(rio_t *rp)
@@ -109,7 +108,8 @@ void read_requesthdrs(rio_t *rp)
   char buf[MAXLINE];
 
   Rio_readlineb(rp, buf, MAXLINE);
-  while(strcmp(buf, "\r\n"))    /* rp로 받아온 &rio의 포인터가 \r\n, 즉 헤더의 끝에 닿을 때까지 while문을 통해 한 줄씩 읽음*/
+  /* rp로 받아온 &rio의 포인터가 \r\n, 즉 헤더의 끝에 닿아서 버퍼에 \r\n만 남을 때까지 while문을 통해 한 줄씩 읽음 */
+  while(strcmp(buf, "\r\n"))
   {
     Rio_readlineb(rp, buf, MAXLINE);
     printf("%s", buf);
@@ -137,7 +137,8 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
   else
   {
     ptr = index(uri, '?');              /* query_string이 존재하는지 확인 */
-    if (ptr) {
+    if (ptr) 
+    {
       strcpy(cgiargs, ptr + 1);         /* cgiargs에 query_string으로 넘어온 값을 저장 */
       *ptr = '\0';                      /* ptr을 Null로 만들어줌 */
     }
@@ -150,7 +151,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
   }
 }
 
-void serve_static(int fd, char *filename, int filesize)
+void serve_static(int fd, char *filename, char *method, int filesize)
 {
   int srcfd;
   char *srcp, filetype[MAXLINE], buf[MAXBUF];
@@ -163,9 +164,16 @@ void serve_static(int fd, char *filename, int filesize)
   sprintf(buf, "%sContent-length: %d\r\n", buf, filesize);
   sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
   Rio_writen(fd, buf, strlen(buf));
+  /* rio_readn은 fd의 현재 파일 위치에서 메모리 위치 usrbuf로 최대 n바이트를 전송한다. */
+  /* rio_writen은 usrfd에서 식별자 fd로 n바이트를 전송한다. */
+  /* 서버에 출력 */
   printf("Response headers:\n");
   printf("%s", buf);
 
+  /* CSAPP 과제 11.11*/
+  if (!strcasecmp(method, "HEAD"))
+    return;
+  
   /* 요청에 대한 바디를 클라이언트에 전달*/
   srcfd = Open(filename, O_RDONLY, 0);
   /* CSAPP 과제 11.9 */
@@ -190,7 +198,7 @@ void get_filetype(char *filename, char *filetype)
   else if (strstr(filename, ".mp4"))      /* CSAPP 과제 11.7 */
     strcpy(filetype, "video/mp4");  
   else
-    strcpy(filetype, "terxt/plance");  
+    strcpy(filetype, "text/plain");  
 }
 
 void serve_dynamic(int fd, char *filename, char *cgiargs)
